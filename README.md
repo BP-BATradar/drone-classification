@@ -78,15 +78,20 @@ own_classificication/
 │   └── unknown/        # Negative class audio clips
 ├── models/             # Trained model outputs
 ├── src/
-│   ├── features.py     # Feature extraction utilities
-│   ├── train_svm.py    # SVM trainer
-│   ├── train_dnn.py    # DNN trainer
-│   ├── train_knn.py    # KNN trainer
-│   ├── train_gmm.py    # GMM trainer
-│   ├── train_cnn.py    # CNN trainer
-│   ├── train_rnn.py    # RNN trainer
-│   ├── audio_server.py # Real-time microphone inference
-│   └── predict.py      # Batch prediction on saved model
+│   ├── features.py         # Feature extraction utilities
+│   ├── train_svm.py        # SVM trainer
+│   ├── train_dnn.py        # DNN trainer
+│   ├── train_knn.py        # KNN trainer
+│   ├── train_gmm.py        # GMM trainer
+│   ├── train_cnn.py        # CNN trainer
+│   ├── train_rnn.py        # RNN trainer
+│   ├── audio_server_svm.py # Real-time microphone inference (SVM)
+│   ├── audio_server_dnn.py # Real-time microphone inference (DNN)
+│   ├── audio_server_knn.py # Real-time microphone inference (KNN)
+│   ├── audio_server_gmm.py # Real-time microphone inference (GMM)
+│   ├── audio_server_cnn.py # Real-time microphone inference (CNN)
+│   ├── audio_server_rnn.py # Real-time microphone inference (RNN)
+│   └── predict.py          # Batch prediction on saved model
 ├── test/
 │   ├── test_svm.py     # SVM evaluation
 │   ├── test_dnn.py     # DNN evaluation
@@ -167,16 +172,43 @@ Output: `filename  label  prob_drone=0.xxxx`
 
 ### Real-time Microphone Inference
 
-Stream live audio from your microphone and get per-second drone probability predictions:
+Stream live audio from your microphone and get per-second drone probability predictions. Each model has its own audio server:
 
 **List available audio devices:**
 ```bash
-python -m src.audio_server --list-devices
+python -m src.audio_server_svm --list-devices
 ```
 
-**Run real-time server (replace device ID):**
+**Run real-time servers (replace device ID):**
+
+**SVM:**
 ```bash
-python -m src.audio_server --model-path models/svm_model.joblib --device 3 --mic-id MY_MIC
+python -m src.audio_server_svm --model-path models/svm_model.joblib --device 3 --mic-id MY_MIC
+```
+
+**DNN:**
+```bash
+python -m src.audio_server_dnn --model-path models/dnn_model.joblib --device 3 --mic-id MY_MIC
+```
+
+**KNN:**
+```bash
+python -m src.audio_server_knn --model-path models/knn_model.joblib --device 3 --mic-id MY_MIC
+```
+
+**GMM:**
+```bash
+python -m src.audio_server_gmm --model-path models/gmm_model.joblib --device 3 --mic-id MY_MIC
+```
+
+**CNN:**
+```bash
+python -m src.audio_server_cnn --model-path models/cnn_model.joblib --device 3 --mic-id MY_MIC
+```
+
+**RNN:**
+```bash
+python -m src.audio_server_rnn --model-path models/rnn_model.joblib --device 3 --mic-id MY_MIC
 ```
 
 Output prints once per second: `[MY_MIC] 2025-01-16 10:30:45  prob_drone=0.7234  label=drone`
@@ -299,8 +331,8 @@ python -m test.test_rnn --data-dir data --model-path models/rnn_model.joblib
 # Run inference on test audio
 python -m src.predict --model-path models/rnn_model.joblib --dir test_audio/
 
-# Real-time streaming
-python -m src.audio_server --model-path models/rnn_model.joblib --device 3 --mic-id MyMic
+# Real-time streaming (choose your preferred model)
+python -m src.audio_server_rnn --model-path models/rnn_model.joblib --device 3 --mic-id MyMic
 ```
 
 ## Troubleshooting
