@@ -1,3 +1,12 @@
+# test/test_knn.py
+
+"""
+This script tests a K-Nearest Neighbors (KNN) model to classify audio files as containing drone or unknown sounds.
+
+Usage:
+    python test/test_knn.py --data-dir <data_directory> --model-path <model_path>
+"""
+
 import os
 import sys
 import glob
@@ -12,10 +21,11 @@ from sklearn.metrics import classification_report, confusion_matrix, accuracy_sc
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from src.features import FeatureConfig, extract_features_from_path
 
-
+# Default classes
 CLASSES: Dict[str, int] = {"drone": 1, "unknown": 0}
 
 
+# Lists all the files in the data directory and returns the paths and labels
 def list_files(data_dir: str, classes: Dict[str, int]) -> Tuple[List[str], np.ndarray]:
     paths: List[str] = []
     labels: List[int] = []
@@ -27,6 +37,7 @@ def list_files(data_dir: str, classes: Dict[str, int]) -> Tuple[List[str], np.nd
     return paths, np.asarray(labels, dtype=int)
 
 
+# Builds the features for the data
 def build_features(paths: List[str], config: FeatureConfig) -> np.ndarray:
     features: List[np.ndarray] = []
     for p in tqdm(paths, desc="Extracting features", unit="file"):
@@ -35,26 +46,35 @@ def build_features(paths: List[str], config: FeatureConfig) -> np.ndarray:
     return X
 
 
+# Tests the KNN model
 def test(data_dir: str, model_path: str, seed: int, test_size: float = 0.2) -> None:
+    # Check if the model file exists
     if not os.path.exists(model_path):
         raise FileNotFoundError(f"Model not found at {model_path}")
 
+    # Load the model
     bundle = joblib.load(model_path)
     pipeline = bundle["pipeline"]
     config = FeatureConfig(**bundle["config"])
 
+    # List all the files in the data directory and get the paths and labels
     paths, y_all = list_files(data_dir, CLASSES)
     if len(paths) == 0:
         raise RuntimeError(f"No wav files found. Expected {data_dir}/drone/*.wav and {data_dir}/unknown/*.wav")
 
+    # Build the features for the data
     X_all = build_features(paths, config)
+    # Split the data into training and testing sets
     _, X_test, _, y_test = train_test_split(
         X_all, y_all, test_size=test_size, random_state=seed, stratify=y_all
     )
 
+    # Predict the labels for the testing set
     y_pred = pipeline.predict(X_test)
+    # Calculate the accuracy
     acc = accuracy_score(y_test, y_pred)
 
+    # Print the confusion matrix and classification report
     print("\n" + "=" * 60)
     print("KNN Model Test Results")
     print("=" * 60)

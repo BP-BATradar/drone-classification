@@ -1,3 +1,20 @@
+# src/train_gmm.py
+
+"""
+This script trains a Gaussian Mixture Model (GMM) to classify audio files as containing drone or unknown sounds.
+
+Usage:
+    python src/train_gmm.py --data-dir <data_directory> --model-path <model_output_path>
+
+Parameters:
+    --data-dir: The root directory containing training data classified into subdirectories 'drone' and 'unknown'.
+    --model-path: Path to save the trained GMM model as a .joblib file.
+
+Output:
+    Trains GMM models on the provided dataset and saves the trained models to the specified path.
+    Prints evaluation metrics including confusion matrix, classification report, and accuracy.
+"""
+
 import os
 import sys
 import glob
@@ -22,12 +39,12 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from src.features import FeatureConfig, extract_features_from_path
 
-
+# Default data and model paths
 DATA_DIR_DEFAULT = "data/train"
 CLASSES: Dict[str, int] = {"drone": 1, "unknown": 0}
 MODEL_PATH_DEFAULT = "models/gmm_model.joblib"
 
-
+# Lists all the files in the data directory and returns the paths and labels
 def list_files(data_dir: str, classes: Dict[str, int]) -> Tuple[List[str], np.ndarray]:
     paths: List[str] = []
     labels: List[int] = []
@@ -38,7 +55,7 @@ def list_files(data_dir: str, classes: Dict[str, int]) -> Tuple[List[str], np.nd
         labels.extend([label] * len(class_paths))
     return paths, np.asarray(labels, dtype=int)
 
-
+# Builds the features for the data
 def build_features(paths: List[str], config: FeatureConfig) -> np.ndarray:
     features: List[np.ndarray] = []
     for p in tqdm(paths, desc="Extracting features", unit="file"):
@@ -46,7 +63,7 @@ def build_features(paths: List[str], config: FeatureConfig) -> np.ndarray:
     X = np.vstack(features)
     return X
 
-
+# Trains and evaluates the GMM model
 def train_and_eval(
     data_dir: str,
     model_path: str,
@@ -58,13 +75,16 @@ def train_and_eval(
     reg_covar: float,
     max_iter: int,
 ) -> None:
+    # List all the files in the data directory and get the paths and labels
     paths, y_all = list_files(data_dir, CLASSES)
     if len(paths) == 0:
         raise RuntimeError(
             f"No wav files found. Expected {data_dir}/drone/*.wav and {data_dir}/unknown/*.wav"
         )
 
+    # Build the features for the data
     X_all = build_features(paths, config).astype(np.float64, copy=False)
+    # Split the data into training and testing sets
     X_train, X_test, y_train, y_test = train_test_split(
         X_all, y_all, test_size=test_size, random_state=seed, stratify=y_all
     )
@@ -74,6 +94,7 @@ def train_and_eval(
     X_train_s = scaler.transform(X_train)
     X_test_s = scaler.transform(X_test)
 
+    # Fits a GMM with retry on standardized features
     def fit_gmm_with_retry(X: np.ndarray, n_comp: int, cov_type: str, reg: float) -> GaussianMixture:
         cov_types_try = [cov_type]
         if cov_type != "diag":
@@ -110,6 +131,7 @@ def train_and_eval(
         print("Info: used fallback GMM (spherical, high reg_covar)")
         return gmm
 
+    # Fit GMMs for each class
     gmm_unknown = fit_gmm_with_retry(X_train_s[y_train == 0], n_components, covariance_type, reg_covar)
     gmm_drone = fit_gmm_with_retry(X_train_s[y_train == 1], n_components, covariance_type, reg_covar)
 
@@ -118,10 +140,12 @@ def train_and_eval(
     logp_drone = gmm_drone.score_samples(X_test_s)
     y_pred = (logp_drone > logp_unknown).astype(int)
 
+    # Calculate the accuracy, precision, recall, and F1 score
     acc = accuracy_score(y_test, y_pred)
     p_bin, r_bin, f1_bin, _ = precision_recall_fscore_support(
         y_test, y_pred, average="binary", pos_label=1, zero_division=0
     )
+    # Print the confusion matrix and classification report
     print("Confusion matrix (rows=true, cols=pred):")
     print(confusion_matrix(y_test, y_pred))
     print(
@@ -134,6 +158,7 @@ def train_and_eval(
     )
     print(f"Accuracy: {acc:.4f}  Precision(drone): {p_bin:.4f}  Recall(drone): {r_bin:.4f}  F1(drone): {f1_bin:.4f}")
 
+    # Save the model
     os.makedirs(os.path.dirname(model_path), exist_ok=True)
     joblib.dump(
         {
@@ -148,6 +173,7 @@ def train_and_eval(
     print(f"Saved model to {model_path}")
 
 
+# Parses the arguments
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Train and evaluate GMMs with internal 80/20 split")
     parser.add_argument("--data-dir", default=DATA_DIR_DEFAULT, type=str, help="Dataset root directory")
@@ -171,7 +197,6 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--max-iter", default=200, type=int, help="Maximum EM iterations")
 
     return parser.parse_args()
-
 
 def main() -> None:
     args = parse_args()

@@ -1,3 +1,20 @@
+# src/train_dnn.py
+
+"""
+This script trains a Deep Neural Network (DNN) model to classify audio files as containing drone or unknown sounds.
+
+Usage:
+    python src/train_dnn.py --data-dir <data_directory> --model-path <model_output_path>
+
+Parameters:
+    --data-dir: The root directory containing training data classified into subdirectories 'drone' and 'unknown'.
+    --model-path: Path to save the trained DNN model as a .joblib file.
+
+Output:
+    Trains a DNN model on the provided dataset and saves the trained model to the specified path.
+    Prints evaluation metrics including confusion matrix, classification report, and accuracy.
+"""
+
 import os
 import sys
 import glob
@@ -23,12 +40,12 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from src.features import FeatureConfig, extract_features_from_path
 
-
+# Default data and model paths
 DATA_DIR_DEFAULT = "data/train"
 CLASSES: Dict[str, int] = {"drone": 1, "unknown": 0}
 MODEL_PATH_DEFAULT = "models/dnn_model.joblib"
 
-
+# Lists all the files in the data directory and returns the paths and labels
 def list_files(data_dir: str, classes: Dict[str, int]) -> Tuple[List[str], np.ndarray]:
     paths: List[str] = []
     labels: List[int] = []
@@ -39,7 +56,7 @@ def list_files(data_dir: str, classes: Dict[str, int]) -> Tuple[List[str], np.nd
         labels.extend([label] * len(class_paths))
     return paths, np.asarray(labels, dtype=int)
 
-
+# Builds the features for the data
 def build_features(paths: List[str], config: FeatureConfig) -> np.ndarray:
     features: List[np.ndarray] = []
     for p in tqdm(paths, desc="Extracting features", unit="file"):
@@ -47,7 +64,7 @@ def build_features(paths: List[str], config: FeatureConfig) -> np.ndarray:
     X = np.vstack(features).astype(np.float32)
     return X
 
-
+# Trains and evaluates the DNN model
 def train_and_eval(
     data_dir: str,
     model_path: str,
@@ -65,13 +82,16 @@ def train_and_eval(
     tol: float,
     n_iter_no_change: int,
 ) -> None:
+    # List all the files in the data directory and get the paths and labels
     paths, y_all = list_files(data_dir, CLASSES)
     if len(paths) == 0:
         raise RuntimeError(
             f"No wav files found. Expected {data_dir}/drone/*.wav and {data_dir}/unknown/*.wav"
         )
 
+    # Build the features for the data
     X_all = build_features(paths, config)
+    # Split the data into training and testing sets
     X_train, X_test, y_train, y_test = train_test_split(
         X_all,
         y_all,
@@ -80,6 +100,7 @@ def train_and_eval(
         stratify=y_all,
     )
 
+    # Create the DNN model
     clf = make_pipeline(
         StandardScaler(),
         MLPClassifier(
@@ -98,13 +119,17 @@ def train_and_eval(
         ),
     )
     print(f"Training DNN with architecture: {hidden_layer_sizes}, max_iter={max_iter}, early_stopping={early_stopping}, tol={tol}, n_iter_no_change={n_iter_no_change}")
+    # Train the model
     clf.fit(X_train, y_train)
 
+    # Predict the labels for the testing set
     y_pred = clf.predict(X_test)
+    # Calculate the accuracy, precision, recall, and F1 score
     acc = accuracy_score(y_test, y_pred)
     p_bin, r_bin, f1_bin, _ = precision_recall_fscore_support(
         y_test, y_pred, average="binary", pos_label=1, zero_division=0
     )
+    # Print the confusion matrix and classification report
     print("Confusion matrix (rows=true, cols=pred):")
     print(confusion_matrix(y_test, y_pred))
     print(
@@ -117,6 +142,7 @@ def train_and_eval(
     )
     print(f"Accuracy: {acc:.4f}  Precision(drone): {p_bin:.4f}  Recall(drone): {r_bin:.4f}  F1(drone): {f1_bin:.4f}")
 
+    # Try to calculate the ROC-AUC score
     try:
         y_scores = clf.predict_proba(X_test)[:, 1]
         auc = roc_auc_score(y_test, y_scores)
@@ -124,6 +150,7 @@ def train_and_eval(
     except Exception:
         pass
 
+    # Save the model
     os.makedirs(os.path.dirname(model_path), exist_ok=True)
     joblib.dump(
         {
@@ -144,6 +171,7 @@ def train_and_eval(
     print(f"Saved model to {model_path}")
 
 
+# Parses the arguments
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Train and evaluate DNN with internal 80/20 split")
     parser.add_argument("--data-dir", default=DATA_DIR_DEFAULT, type=str, help="Dataset root directory")
