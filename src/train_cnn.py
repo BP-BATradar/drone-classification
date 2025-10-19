@@ -1,4 +1,5 @@
 import os
+import sys
 import glob
 import argparse
 import joblib
@@ -10,13 +11,16 @@ from sklearn.metrics import classification_report, confusion_matrix, accuracy_sc
 import tensorflow as tf
 from tensorflow.keras import layers, models, optimizers, callbacks
 
+# Add parent directory to path for imports
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from src.features import (
     FeatureConfig,
     extract_log_mel_from_path,
 )
 
 
-DATA_DIR_DEFAULT = "data"
+DATA_DIR_DEFAULT = "data/train"
 CLASSES: Dict[str, int] = {"drone": 1, "unknown": 0}
 MODEL_PATH_DEFAULT = "models/cnn_model.joblib"
 

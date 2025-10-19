@@ -1,4 +1,5 @@
 import os
+import sys
 import glob
 import argparse
 import joblib
@@ -15,10 +16,14 @@ from sklearn.metrics import (
     accuracy_score,
     precision_recall_fscore_support,
 )
+
+# Add parent directory to path for imports
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from src.features import FeatureConfig, extract_features_from_path
 
 
-DATA_DIR_DEFAULT = "data"
+DATA_DIR_DEFAULT = "data/train"
 CLASSES: Dict[str, int] = {"drone": 1, "unknown": 0}
 MODEL_PATH_DEFAULT = "models/gmm_model.joblib"
 

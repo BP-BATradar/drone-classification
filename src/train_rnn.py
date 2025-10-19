@@ -1,4 +1,5 @@
 import os
+import sys
 import glob
 import argparse
 import joblib
@@ -10,13 +11,16 @@ from sklearn.metrics import classification_report, confusion_matrix, accuracy_sc
 import tensorflow as tf
 from tensorflow.keras import layers, models, optimizers, callbacks
 
+# Add parent directory to path for imports
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from src.features import (
     FeatureConfig,
     extract_mfcc_sequence_from_path,
 )
 
 
-DATA_DIR_DEFAULT = "data"
+DATA_DIR_DEFAULT = "data/train"
 CLASSES: Dict[str, int] = {"drone": 1, "unknown": 0}
 MODEL_PATH_DEFAULT = "models/rnn_model.joblib"
 
@@ -135,8 +139,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--epochs", default=1000, type=int)
     parser.add_argument("--batch-size", default=64, type=int)
     parser.add_argument("--lr", default=1e-3, type=float)
-    parser.add_argument("--early-stopping", action="store_true", help="Enable early stopping (disabled by default)")
-    parser.add_argument("--patience", default=10, type=int, help="Early stopping patience")
+    parser.add_argument("--no-early-stopping", action="store_true", help="Disable early stopping (enabled by default)")
+    parser.add_argument("--patience", default=20, type=int, help="Early stopping patience")
 
     return parser.parse_args()
 
@@ -161,7 +165,7 @@ def main() -> None:
         epochs=args.epochs,
         batch_size=args.batch_size,
         lr=args.lr,
-        early_stopping=args.early_stopping,
+        early_stopping=not args.no_early_stopping,
         patience=args.patience,
     )
 

@@ -1,4 +1,5 @@
 import os
+import sys
 import glob
 import argparse
 import joblib
@@ -16,10 +17,14 @@ from sklearn.metrics import (
     accuracy_score,
     precision_recall_fscore_support,
 )
+
+# Add parent directory to path for imports
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from src.features import FeatureConfig, extract_features_from_path
 
 
-DATA_DIR_DEFAULT = "data"
+DATA_DIR_DEFAULT = "data/train"
 CLASSES: Dict[str, int] = {"drone": 1, "unknown": 0}
 MODEL_PATH_DEFAULT = "models/dnn_model.joblib"
 
@@ -172,10 +177,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--alpha", default=0.0001, type=float, help="L2 regularization parameter")
     parser.add_argument("--learning-rate-init", default=0.001, type=float, help="Initial learning rate")
     parser.add_argument("--max-iter", default=2000, type=int, help="Maximum number of iterations")
-    parser.add_argument("--early-stopping", action="store_true", help="Enable early stopping (disabled by default)")
+    parser.add_argument("--no-early-stopping", action="store_true", help="Disable early stopping (enabled by default)")
     parser.add_argument("--validation-fraction", default=0.1, type=float, help="Fraction of training data for validation (when early stopping)")
-    parser.add_argument("--tol", default=0.0, type=float, help="Tolerance for optimization (set 0.0 to disable convergence stop)")
-    parser.add_argument("--n-iter-no-change", default=1000000, type=int, help="Number of epochs with no improvement to wait before stopping when early_stopping or convergence is used")
+    parser.add_argument("--tol", default=1e-4, type=float, help="Tolerance for optimization convergence")
+    parser.add_argument("--n-iter-no-change", default=20, type=int, help="Number of epochs with no improvement to wait before stopping")
 
     return parser.parse_args()
 
@@ -206,7 +211,7 @@ def main() -> None:
         alpha=args.alpha,
         learning_rate_init=args.learning_rate_init,
         max_iter=args.max_iter,
-        early_stopping=args.early_stopping,
+        early_stopping=not args.no_early_stopping,
         validation_fraction=args.validation_fraction,
         tol=args.tol,
         n_iter_no_change=args.n_iter_no_change,

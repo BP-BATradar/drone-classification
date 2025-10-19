@@ -17,15 +17,25 @@ Each model is trained on a stratified 80/20 train/test split and evaluated with 
 
 ## Dataset
 
-The drone audio dataset is sourced from [BowonY/drone-audio-detection](https://github.com/BowonY/drone-audio-detection). The dataset contains:
+This project uses a combination of two audio datasets:
 
-- **data/drone/** - 1,332 positive class (drone) audio clips
-- **data/unknown/** - 10,372 negative class (non-drone) audio clips
-- All clips are 1-second WAV files at 16 kHz
+### BowonY Dataset
+The primary dataset is sourced from [BowonY/drone-audio-detection](https://github.com/BowonY/drone-audio-detection):
+- **data/BowonY/drone/** - 1,332 positive class (drone) audio clips
+- **data/BowonY/unknown/** - 10,372 negative class (non-drone) audio clips
+
+### Custom Recorded Data
+Additional audio data was recorded and processed for this project:
+- **data/djineo/** - Custom recorded audio files split into 1-second segments
+- **data/raw/** - Original longer audio files before segmentation
+- **data/scripts/raw.py** - Audio segmentation tool for creating 1-second clips
+
+All clips are 1-second WAV files at 16 kHz, processed using the included audio segmentation script.
 
 ### Attribution
 
-Dataset credit: [@BowonY](https://github.com/BowonY) and contributors to [drone-audio-detection](https://github.com/BowonY/drone-audio-detection).
+- **BowonY Dataset**: Credit to [@BowonY](https://github.com/BowonY) and contributors to [drone-audio-detection](https://github.com/BowonY/drone-audio-detection)
+- **Custom Data**: Recorded and processed specifically for this project
 
 ## Setup
 
@@ -74,9 +84,15 @@ pip install tensorflow-metal  # Optional: for GPU acceleration
 ```
 own_classificication/
 ├── data/
-│   ├── drone/          # Positive class audio clips
-│   └── unknown/        # Negative class audio clips
-├── models/             # Trained model outputs
+│   ├── BowonY/             # BowonY dataset
+│   │   ├── drone/          # 1,332 drone audio clips
+│   │   └── unknown/        # 10,372 non-drone audio clips
+│   ├── djineo/             # Custom recorded data (segmented)
+│   ├── raw/                # Original audio files before segmentation
+│   ├── train/              # Training data (drone/ and unknown/ subdirs)
+│   └── scripts/
+│       └── raw.py          # Audio segmentation tool
+├── models/                 # Trained model outputs
 ├── src/
 │   ├── features.py         # Feature extraction utilities
 │   ├── train_svm.py        # SVM trainer
@@ -85,6 +101,7 @@ own_classificication/
 │   ├── train_gmm.py        # GMM trainer
 │   ├── train_cnn.py        # CNN trainer
 │   ├── train_rnn.py        # RNN trainer
+│   ├── test_dir.py         # Directory testing tool
 │   ├── audio_server_svm.py # Real-time microphone inference (SVM)
 │   ├── audio_server_dnn.py # Real-time microphone inference (DNN)
 │   ├── audio_server_knn.py # Real-time microphone inference (KNN)
@@ -105,38 +122,49 @@ own_classificication/
 
 ## Usage
 
+### Audio Segmentation
+
+Before training, you may need to segment longer audio files into 1-second clips:
+
+```bash
+# Segment a single file
+python data/scripts/raw.py data/raw/40sek.wav data/djineo
+
+# This creates files like: 40sek_01.wav, 40sek_02.wav, etc.
+```
+
 ### Training Models
 
-Each trainer uses an 80/20 stratified split and outputs the trained model plus evaluation metrics on the test set.
+Each trainer uses an 80/20 stratified split and outputs the trained model plus evaluation metrics on the test set. The training data should be organized in `data/train/drone/` and `data/train/unknown/` directories.
 
 **SVM (Support Vector Machine):**
 ```bash
-python -m src.train_svm --data-dir data --model-path models/svm_model.joblib --probability
+python src/train_svm.py --data-dir data/train --model-path models/svm_model.joblib --probability
 ```
 
 **DNN (Deep Neural Network):**
 ```bash
-python -m src.train_dnn --data-dir data --model-path models/dnn_model.joblib --max-iter 2000
+python src/train_dnn.py --data-dir data/train --model-path models/dnn_model.joblib --max-iter 2000
 ```
 
 **KNN (K-Nearest Neighbors):**
 ```bash
-python -m src.train_knn --data-dir data --model-path models/knn_model.joblib --n-neighbors 5
+python src/train_knn.py --data-dir data/train --model-path models/knn_model.joblib --n-neighbors 5
 ```
 
 **GMM (Gaussian Mixture Model):**
 ```bash
-python -m src.train_gmm --data-dir data --model-path models/gmm_model.joblib --n-components 4
+python src/train_gmm.py --data-dir data/train --model-path models/gmm_model.joblib --n-components 4
 ```
 
 **CNN (Convolutional Neural Network):**
 ```bash
-python -m src.train_cnn --data-dir data --model-path models/cnn_model.joblib --epochs 30
+python src/train_cnn.py --data-dir data/train --model-path models/cnn_model.joblib --epochs 30
 ```
 
 **RNN (Recurrent Neural Network):**
 ```bash
-python -m src.train_rnn --data-dir data --model-path models/rnn_model.joblib --epochs 1000
+python src/train_rnn.py --data-dir data/train --model-path models/rnn_model.joblib --epochs 1000
 ```
 
 ### Testing Models
@@ -153,6 +181,24 @@ python -m test.test_rnn --data-dir data --model-path models/rnn_model.joblib
 ```
 
 Each test script outputs a confusion matrix, classification report (precision, recall, F1), and accuracy.
+
+### Directory Testing
+
+Test all .wav files in a directory with confidence scores:
+
+```bash
+# Test all files in a directory
+python src/test_dir.py models/cnn_model.joblib data/djineo/
+
+# Save results to CSV
+python src/test_dir.py models/dnn_model.joblib data/test/ --output results.csv
+```
+
+This provides:
+- **Drone probability** (0.0 to 1.0) for each file
+- **Confidence score** (how certain the model is)
+- **Prediction** (DRONE or UNKNOWN)
+- **Summary statistics** (total counts, average confidence)
 
 ### Batch Prediction
 
@@ -312,24 +358,27 @@ python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 
-# Train all models
-python -m src.train_svm --data-dir data --model-path models/svm_model.joblib --probability
-python -m src.train_dnn --data-dir data --model-path models/dnn_model.joblib
-python -m src.train_knn --data-dir data --model-path models/knn_model.joblib
-python -m src.train_gmm --data-dir data --model-path models/gmm_model.joblib
-python -m src.train_cnn --data-dir data --model-path models/cnn_model.joblib
-python -m src.train_rnn --data-dir data --model-path models/rnn_model.joblib
+# Segment custom audio files (if needed)
+python data/scripts/raw.py data/raw/40sek.wav data/djineo
+
+# Train all models (using data/train/ directory)
+python src/train_svm.py --data-dir data/train --model-path models/svm_model.joblib --probability
+python src/train_dnn.py --data-dir data/train --model-path models/dnn_model.joblib
+python src/train_knn.py --data-dir data/train --model-path models/knn_model.joblib
+python src/train_gmm.py --data-dir data/train --model-path models/gmm_model.joblib
+python src/train_cnn.py --data-dir data/train --model-path models/cnn_model.joblib
+python src/train_rnn.py --data-dir data/train --model-path models/rnn_model.joblib
 
 # Test and compare
-python -m test.test_svm --data-dir data --model-path models/svm_model.joblib
-python -m test.test_dnn --data-dir data --model-path models/dnn_model.joblib
-python -m test.test_knn --data-dir data --model-path models/knn_model.joblib
-python -m test.test_gmm --data-dir data --model-path models/gmm_model.joblib
-python -m test.test_cnn --data-dir data --model-path models/cnn_model.joblib
-python -m test.test_rnn --data-dir data --model-path models/rnn_model.joblib
+python -m test.test_svm --data-dir data/train --model-path models/svm_model.joblib
+python -m test.test_dnn --data-dir data/train --model-path models/dnn_model.joblib
+python -m test.test_knn --data-dir data/train --model-path models/knn_model.joblib
+python -m test.test_gmm --data-dir data/train --model-path models/gmm_model.joblib
+python -m test.test_cnn --data-dir data/train --model-path models/cnn_model.joblib
+python -m test.test_rnn --data-dir data/train --model-path models/rnn_model.joblib
 
-# Run inference on test audio
-python -m src.predict --model-path models/rnn_model.joblib --dir test_audio/
+# Test custom recorded data
+python src/test_dir.py models/rnn_model.joblib data/djineo/ --output custom_results.csv
 
 # Real-time streaming (choose your preferred model)
 python -m src.audio_server_rnn --model-path models/rnn_model.joblib --device 3 --mic-id MyMic
