@@ -87,7 +87,7 @@ def test(data_dir: str, model_path: str, seed: int, test_size: float = 0.2) -> N
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Test KNN model on held-out test set")
-    parser.add_argument("--data-dir", default="data", type=str, help="Dataset root directory")
+    parser.add_argument("--data-dir", default="data/train", type=str, help="Dataset root directory")
     parser.add_argument("--model-path", default="models/knn_model.joblib", type=str, help="Path to trained KNN model")
     parser.add_argument("--seed", default=42, type=int, help="Random seed (must match training seed)")
     parser.add_argument("--test-size", default=0.2, type=float, help="Test split fraction")
