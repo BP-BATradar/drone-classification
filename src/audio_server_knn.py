@@ -27,7 +27,7 @@ import numpy as np
 import sounddevice as sd
 import joblib
 
-from src.features import FeatureConfig, extract_features, load_mono_audio, compute_mfcc_feature_vector
+from src.features import FeatureConfig, load_mono_audio, compute_mfcc_feature_vector
 
 
 # Lists all available audio input devices
